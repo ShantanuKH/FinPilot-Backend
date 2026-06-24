@@ -6,6 +6,7 @@ import com.shantanu.FinPilot.auth.dto.LoginRequest;
 import com.shantanu.FinPilot.auth.dto.RegisterRequest;
 import com.shantanu.FinPilot.common.exception.InvalidCredentialsException;
 import com.shantanu.FinPilot.common.exception.UserAlreadyExistsException;
+import com.shantanu.FinPilot.common.security.JwtService;
 import com.shantanu.FinPilot.user.entity.Role;
 import com.shantanu.FinPilot.user.entity.RoleType;
 import com.shantanu.FinPilot.user.entity.User;
@@ -25,6 +26,7 @@ public class AuthService {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JwtService jwtService;
 
 //    User Register Service
     public void register(RegisterRequest registerRequest){
@@ -84,9 +86,16 @@ public class AuthService {
             );
         }
 
+        String token = jwtService.generateToken(
+                user.getEmail()
+        );
+
         return AuthResponse.builder()
                 .message("Login Successful")
+                .token(token)
                 .build();
     }
+
+
 
 }
