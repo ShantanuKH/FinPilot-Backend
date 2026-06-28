@@ -51,4 +51,11 @@ public class User {
     )
     @Builder.Default
     private Set<Role> roles = new HashSet<>();
+
+    private Double monthlyIncomne;
+
+    @Enumerated(EnumType.STRING)
+    private RiskProfile riskProfile;
+
+    private String currency;
 }
