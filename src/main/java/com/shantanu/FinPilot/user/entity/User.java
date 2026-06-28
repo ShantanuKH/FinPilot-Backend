@@ -52,7 +52,7 @@ public class User {
     @Builder.Default
     private Set<Role> roles = new HashSet<>();
 
-    private Double monthlyIncomne;
+    private Double monthlyIncome;
 
     @Enumerated(EnumType.STRING)
     private RiskProfile riskProfile;
