@@ -4,6 +4,7 @@ package com.shantanu.FinPilot.user.controller;
 import com.shantanu.FinPilot.user.dto.UpdateProfileRequest;
 import com.shantanu.FinPilot.user.dto.UserProfileResponse;
 import com.shantanu.FinPilot.user.service.UserService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -26,7 +27,7 @@ public class UserController {
     @PostMapping("/updateProfile")
     public UserProfileResponse updateUserProfile(
             Authentication authentication,
-            @RequestBody UpdateProfileRequest updateProfileRequest
+            @Valid @RequestBody UpdateProfileRequest updateProfileRequest
 
             ){
         String email = authentication.getName();
