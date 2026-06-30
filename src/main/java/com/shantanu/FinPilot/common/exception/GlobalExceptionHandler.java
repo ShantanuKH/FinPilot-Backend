@@ -18,29 +18,6 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponse> handleGlobalExceptionHandler(
-            Exception ex,
-            HttpServletRequest request) {
-
-        log.error("Unexpected exception occurred", ex);
-
-        ErrorResponse error =
-                new ErrorResponse(
-                        LocalDateTime.now(),
-                        HttpStatus.INTERNAL_SERVER_ERROR.value(),
-                        "INTERNAL_SERVER_ERROR",
-                        ex.getMessage(),
-                        request.getRequestURI()
-                );
-
-
-
-        return ResponseEntity
-                .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(error);
-    }
-
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ErrorResponse>
     handleResourceNotFoundException(
@@ -83,7 +60,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(InvalidCredentialsException.class)
     public ResponseEntity<ErrorResponse>
-        handleInvalidCredentialsException(
+    handleInvalidCredentialsException(
             InvalidCredentialsException ex,
             HttpServletRequest request) {
 
@@ -98,6 +75,50 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity
                 .status(HttpStatus.UNAUTHORIZED)
+                .body(error);
+    }
+
+    @ExceptionHandler(ExpenseNotFoundException.class)
+    public ResponseEntity<ErrorResponse>
+    handleExpenseNotFoundException(
+            ExpenseNotFoundException ex,
+            HttpServletRequest request
+    ) {
+
+        ErrorResponse error =
+                new ErrorResponse(
+                        LocalDateTime.now(),
+                        HttpStatus.NOT_FOUND.value(),
+                        "NOT_FOUND",
+                        ex.getMessage(),
+                        request.getRequestURI()
+                );
+
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(error);
+    }
+
+    @ExceptionHandler(
+            UnauthorizedExpenseAccessException.class
+    )
+    public ResponseEntity<ErrorResponse>
+    handleUnauthorizedExpenseAccessException(
+            UnauthorizedExpenseAccessException ex,
+            HttpServletRequest request
+    ) {
+
+        ErrorResponse error =
+                new ErrorResponse(
+                        LocalDateTime.now(),
+                        HttpStatus.FORBIDDEN.value(),
+                        "FORBIDDEN",
+                        ex.getMessage(),
+                        request.getRequestURI()
+                );
+
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
                 .body(error);
     }
 
@@ -128,5 +149,50 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .badRequest()
                 .body(errors);
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ErrorResponse>
+    handleGlobalExceptionHandler(
+            Exception ex,
+            HttpServletRequest request) {
+
+        log.error(
+                "Unexpected exception occurred",
+                ex
+        );
+
+        ErrorResponse error =
+                new ErrorResponse(
+                        LocalDateTime.now(),
+                        HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                        "INTERNAL_SERVER_ERROR",
+                        ex.getMessage(),
+                        request.getRequestURI()
+                );
+
+        return ResponseEntity
+                .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(error);
+    }
+    @ExceptionHandler(UserNotFoundException.class)
+    public ResponseEntity<ErrorResponse>
+    handleUserNotFoundException(
+            UserNotFoundException ex,
+            HttpServletRequest request
+    ) {
+
+        ErrorResponse error =
+                new ErrorResponse(
+                        LocalDateTime.now(),
+                        HttpStatus.NOT_FOUND.value(),
+                        "NOT_FOUND",
+                        ex.getMessage(),
+                        request.getRequestURI()
+                );
+
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(error);
     }
 }

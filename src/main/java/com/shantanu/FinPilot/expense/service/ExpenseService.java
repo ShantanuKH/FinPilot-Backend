@@ -1,5 +1,8 @@
 package com.shantanu.FinPilot.expense.service;
 
+import com.shantanu.FinPilot.common.exception.ExpenseNotFoundException;
+import com.shantanu.FinPilot.common.exception.UnauthorizedExpenseAccessException;
+import com.shantanu.FinPilot.common.exception.UserNotFoundException;
 import com.shantanu.FinPilot.expense.dto.CreateExpenseRequest;
 import com.shantanu.FinPilot.expense.dto.ExpenseResponse;
 import com.shantanu.FinPilot.expense.dto.UpdateExpenseRequest;
@@ -8,7 +11,6 @@ import com.shantanu.FinPilot.expense.repository.ExpenseRepository;
 import com.shantanu.FinPilot.user.entity.User;
 import com.shantanu.FinPilot.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -23,13 +25,15 @@ public class ExpenseService {
     public ExpenseResponse createExpense(
             String email,
             CreateExpenseRequest createExpenseRequest
-    ){
+    ) {
+
         User user = userRepository.findByEmail(email)
                 .orElseThrow(
-                        ()-> new RuntimeException(
+                        () -> new UserNotFoundException(
                                 "User Not Found"
                         )
                 );
+
         Expense expense = Expense.builder()
                 .title(createExpenseRequest.getTitle())
                 .amount(createExpenseRequest.getAmount())
@@ -49,16 +53,15 @@ public class ExpenseService {
                 .expenseDate(savedExpense.getExpenseDate())
                 .category(savedExpense.getCategory())
                 .build();
-
     }
 
     public List<ExpenseResponse> getMyExpenses(
             String email
     ) {
-        User user = userRepository
-                .findByEmail(email)
+
+        User user = userRepository.findByEmail(email)
                 .orElseThrow(
-                        () -> new RuntimeException(
+                        () -> new UserNotFoundException(
                                 "User Not Found"
                         )
                 );
@@ -83,58 +86,61 @@ public class ExpenseService {
     public void deleteExpense(
             Long expenseId,
             String email
-    ){
-//          To find the user
+    ) {
+
         User currentUser = userRepository
                 .findByEmail(email)
                 .orElseThrow(
-                        () -> new RuntimeException(
+                        () -> new UserNotFoundException(
                                 "User Not Found"
                         )
                 );
-//        To find the expense Id that is to be deleted
+
         Expense expense = expenseRepository
                 .findById(expenseId)
                 .orElseThrow(
-                        () -> new RuntimeException(
+                        () -> new ExpenseNotFoundException(
                                 "Expense Not Found"
                         )
                 );
 
-        if(!expense.getUser().getId()
-                .equals(currentUser.getId())){
-            throw new RuntimeException(
-                    "You are not authorized to delete the expense"
+        if (!expense.getUser().getId()
+                .equals(currentUser.getId())) {
+
+            throw new UnauthorizedExpenseAccessException(
+                    "You are not authorized to delete this expense"
             );
         }
+
         expenseRepository.delete(expense);
     }
 
-//    TO update the Expense
     public ExpenseResponse updateExpense(
             Long expenseId,
             String email,
             UpdateExpenseRequest updateExpenseRequest
-    ){
+    ) {
 
         User currentUser = userRepository
                 .findByEmail(email)
                 .orElseThrow(
-                        () -> new RuntimeException(
+                        () -> new UserNotFoundException(
                                 "User Not Found"
                         )
                 );
+
         Expense expense = expenseRepository
                 .findById(expenseId)
                 .orElseThrow(
-                        () -> new RuntimeException(
+                        () -> new ExpenseNotFoundException(
                                 "Expense Not Found"
                         )
                 );
+
         if (!expense.getUser().getId()
                 .equals(currentUser.getId())) {
 
-            throw new RuntimeException(
+            throw new UnauthorizedExpenseAccessException(
                     "You are not authorized to update this expense"
             );
         }
@@ -167,5 +173,4 @@ public class ExpenseService {
                 .category(updatedExpense.getCategory())
                 .build();
     }
-
 }
