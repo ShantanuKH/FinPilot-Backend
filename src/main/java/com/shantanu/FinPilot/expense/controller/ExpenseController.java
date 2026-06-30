@@ -3,11 +3,15 @@ package com.shantanu.FinPilot.expense.controller;
 
 import com.shantanu.FinPilot.expense.dto.CreateExpenseRequest;
 import com.shantanu.FinPilot.expense.dto.ExpenseResponse;
+import com.shantanu.FinPilot.expense.dto.UpdateExpenseRequest;
 import com.shantanu.FinPilot.expense.service.ExpenseService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/expenses")
@@ -27,6 +31,53 @@ public class ExpenseController {
         return expenseService.createExpense(
                 email,
                 request
+        );
+    }
+
+
+//    Get Expenses
+    @GetMapping
+    public List<ExpenseResponse> getMyExpenses(
+            Authentication authentication){
+
+        String email = authentication.getName();
+
+        return expenseService.getMyExpenses(email);
+    }
+
+//    Delete Expenses
+    @DeleteMapping("/{id}")
+    public ResponseEntity<String> deleteExpense(
+            @PathVariable Long id,
+            Authentication authentication
+    ) {
+
+        String email = authentication.getName();
+
+        expenseService.deleteExpense(id, email);
+
+        return ResponseEntity.ok(
+                "Expense deleted successfully"
+        );
+
+
+
+}
+
+    //        Update the expense
+    @PutMapping("/{id}")
+    public ExpenseResponse updateExpense(
+            @PathVariable Long id,
+            Authentication authentication,
+            @Valid @RequestBody UpdateExpenseRequest updateExpenseRequest
+    ) {
+
+        String email = authentication.getName();
+
+        return expenseService.updateExpense(
+                id,
+                email,
+                updateExpenseRequest
         );
     }
 }
