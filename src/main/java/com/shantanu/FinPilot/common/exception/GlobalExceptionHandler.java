@@ -195,4 +195,50 @@ public class GlobalExceptionHandler {
                 .status(HttpStatus.NOT_FOUND)
                 .body(error);
     }
+
+    @ExceptionHandler(
+            BudgetNotFoundException.class
+    )
+    public ResponseEntity<ErrorResponse>
+    handleBudgetNotFoundException(
+            BudgetNotFoundException ex,
+            HttpServletRequest request
+    ) {
+
+        ErrorResponse error =
+                new ErrorResponse(
+                        LocalDateTime.now(),
+                        HttpStatus.NOT_FOUND.value(),
+                        "NOT_FOUND",
+                        ex.getMessage(),
+                        request.getRequestURI()
+                );
+
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(error);
+    }
+
+    @ExceptionHandler(
+            UnauthorizedBudgetAccessException.class
+    )
+    public ResponseEntity<ErrorResponse>
+    handleUnauthorizedBudgetAccessException(
+            UnauthorizedBudgetAccessException ex,
+            HttpServletRequest request
+    ) {
+
+        ErrorResponse error =
+                new ErrorResponse(
+                        LocalDateTime.now(),
+                        HttpStatus.FORBIDDEN.value(),
+                        "FORBIDDEN",
+                        ex.getMessage(),
+                        request.getRequestURI()
+                );
+
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .body(error);
+    }
 }

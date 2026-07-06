@@ -1,5 +1,6 @@
 package com.shantanu.FinPilot.user.entity;
 
+import com.shantanu.FinPilot.budget.entity.Budget;
 import com.shantanu.FinPilot.expense.entity.Expense;
 import jakarta.persistence.*;
 import lombok.*;
@@ -69,4 +70,14 @@ public class User {
     )
     @Builder.Default
     private List<Expense> expenses = new ArrayList<>();
+
+    @OneToMany(
+            mappedBy = "user",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true
+    )
+
+    @Builder.Default
+    private List<Budget> budgets =
+            new ArrayList<>();
 }
