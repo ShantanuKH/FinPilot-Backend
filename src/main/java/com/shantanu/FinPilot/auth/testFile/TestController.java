@@ -1,4 +1,4 @@
-package com.shantanu.FinPilot.auth.controller;
+package com.shantanu.FinPilot.auth.testFile;
 
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -13,6 +13,7 @@ public class TestController {
     public String hello() {
         return "Hello Authenticated User";
     }
+
     @GetMapping("/me")
     public String me(Authentication authentication) {
         return authentication.getName();

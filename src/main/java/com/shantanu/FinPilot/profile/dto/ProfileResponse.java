@@ -21,4 +21,5 @@ public class ProfileResponse {
     private RiskProfile riskProfile;
 
     private String currency;
+
 }
