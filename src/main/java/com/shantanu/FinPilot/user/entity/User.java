@@ -2,6 +2,7 @@ package com.shantanu.FinPilot.user.entity;
 
 import com.shantanu.FinPilot.budget.entity.Budget;
 import com.shantanu.FinPilot.expense.entity.Expense;
+import com.shantanu.FinPilot.investment.entity.Investment;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -79,5 +80,14 @@ public class User {
 
     @Builder.Default
     private List<Budget> budgets =
+            new ArrayList<>();
+
+    @OneToMany(
+            mappedBy = "user",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true
+    )
+    @Builder.Default
+    private List<Investment> investments =
             new ArrayList<>();
 }
