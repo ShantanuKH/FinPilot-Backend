@@ -29,16 +29,21 @@ public class RecommendationService {
     private final BudgetRepository budgetRepository;
     private final InvestmentRepository investmentRepository;
 
-    public RecommendationResponse getRecommendations(
-            String email
-    ) {
+    public RecommendationResponse getRecommendations(String email) {
+
+        List<String> recommendations = generateRecommendations(email);
+
+        return RecommendationResponse.builder()
+                .recommendations(recommendations)
+                .build();
+    }
+
+    public List<String> generateRecommendations(String email) {
+
         User user = userRepository
                 .findByEmail(email)
-                .orElseThrow(
-                        () -> new UserNotFoundException(
-                                "User Not Found"
-                        )
-                );
+                .orElseThrow(() ->
+                        new UserNotFoundException("User Not Found"));
 
         List<Expense> expenses =
                 expenseRepository.findByUser(user);
@@ -51,7 +56,6 @@ public class RecommendationService {
 
         List<String> recommendations = new ArrayList<>();
 
-
         addSavingsRecommendation(recommendations, user, expenses);
 
         addInvestmentRiskRecommendation(recommendations, user, investments);
@@ -62,10 +66,7 @@ public class RecommendationService {
 
         addEmergencyFundRecommendation(recommendations, user, expenses);
 
-        return RecommendationResponse.builder()
-                .recommendations(recommendations)
-                .build();
-
+        return recommendations;
     }
 
 
