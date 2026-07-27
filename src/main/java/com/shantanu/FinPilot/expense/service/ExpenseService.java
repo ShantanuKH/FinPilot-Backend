@@ -12,6 +12,10 @@ import com.shantanu.FinPilot.user.entity.User;
 import com.shantanu.FinPilot.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import com.shantanu.FinPilot.common.dto.PagedResponse;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 
@@ -55,9 +59,10 @@ public class ExpenseService {
                 .build();
     }
 
-    public List<ExpenseResponse> getMyExpenses(
-            String email
-    ) {
+    public PagedResponse<ExpenseResponse> getMyExpenses(
+            String email,
+            Pageable pageable
+    ){
 
         User user = userRepository.findByEmail(email)
                 .orElseThrow(
@@ -66,21 +71,35 @@ public class ExpenseService {
                         )
                 );
 
-        List<Expense> expenses =
-                expenseRepository.findByUser(user);
+        Page<Expense> expenses =
+                expenseRepository.findByUser(
+                        user,
+                        pageable
+                );
+        List<ExpenseResponse> expenseResponses =
+                expenses.getContent()
+                        .stream()
+                        .map(expense ->
+                                ExpenseResponse.builder()
+                                        .id(expense.getId())
+                                        .title(expense.getTitle())
+                                        .amount(expense.getAmount())
+                                        .description(expense.getDescription())
+                                        .expenseDate(expense.getExpenseDate())
+                                        .category(expense.getCategory())
+                                        .build()
+                        )
+                        .toList();
 
-        return expenses.stream()
-                .map(expense ->
-                        ExpenseResponse.builder()
-                                .id(expense.getId())
-                                .title(expense.getTitle())
-                                .amount(expense.getAmount())
-                                .description(expense.getDescription())
-                                .expenseDate(expense.getExpenseDate())
-                                .category(expense.getCategory())
-                                .build()
-                )
-                .toList();
+        return PagedResponse.<ExpenseResponse>builder()
+                .content(expenseResponses)
+                .page(expenses.getNumber())
+                .size(expenses.getSize())
+                .totalElements(expenses.getTotalElements())
+                .totalPages(expenses.getTotalPages())
+                .first(expenses.isFirst())
+                .last(expenses.isLast())
+                .build();
     }
 
     public void deleteExpense(

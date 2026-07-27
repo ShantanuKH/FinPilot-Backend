@@ -1,5 +1,6 @@
 package com.shantanu.FinPilot.recommendation.service;
 
+import com.shantanu.FinPilot.ai.dto.AiFinancialContext;
 import com.shantanu.FinPilot.budget.entity.Budget;
 import com.shantanu.FinPilot.budget.respository.BudgetRepository;
 import com.shantanu.FinPilot.common.exception.UserNotFoundException;
@@ -28,6 +29,8 @@ public class RecommendationService {
     private final ExpenseRepository expenseRepository;
     private final BudgetRepository budgetRepository;
     private final InvestmentRepository investmentRepository;
+
+
 
     public RecommendationResponse getRecommendations(String email) {
 
@@ -67,6 +70,58 @@ public class RecommendationService {
         addEmergencyFundRecommendation(recommendations, user, expenses);
 
         return recommendations;
+    }
+
+    public AiFinancialContext buildFinancialContext(String email) {
+
+        User user = userRepository
+                .findByEmail(email)
+                .orElseThrow(() ->
+                        new UserNotFoundException("User Not Found"));
+
+        List<Expense> expenses =
+                expenseRepository.findByUser(user);
+
+        List<Budget> budgets =
+                budgetRepository.findByUser(user);
+
+        List<Investment> investments =
+                investmentRepository.findByUser(user);
+
+        Double monthlyIncome = user.getMonthlyIncome();
+
+        Double totalExpenses = expenses.stream()
+                .mapToDouble(Expense::getAmount)
+                .sum();
+
+        Double monthlySavings =
+                monthlyIncome - totalExpenses;
+
+        Double savingsRate =
+                monthlyIncome > 0
+                        ? (monthlySavings / monthlyIncome) * 100
+                        : 0.0;
+
+        List<String> recommendations = new ArrayList<>();
+
+        addSavingsRecommendation(recommendations, user, expenses);
+
+        addInvestmentRiskRecommendation(recommendations, user, investments);
+
+        addBudgetRecommendation(recommendations, budgets, expenses);
+
+        addDiversificationRecommendation(recommendations, investments);
+
+        addEmergencyFundRecommendation(recommendations, user, expenses);
+
+        return AiFinancialContext.builder()
+                .monthlyIncome(monthlyIncome)
+                .totalExpenses(totalExpenses)
+                .monthlySavings(monthlySavings)
+                .savingsRate(savingsRate)
+                .riskProfile(user.getRiskProfile())
+                .recommendations(recommendations)
+                .build();
     }
 
 

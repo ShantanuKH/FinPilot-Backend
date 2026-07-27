@@ -10,6 +10,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import com.shantanu.FinPilot.common.dto.PagedResponse;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 
@@ -34,16 +36,20 @@ public class ExpenseController {
         );
     }
 
+    //    Get Expenses
+            @GetMapping
+            public PagedResponse<ExpenseResponse> getMyExpenses(
+                    Authentication authentication,
+                    Pageable pageable
+            ) {
 
-//    Get Expenses
-    @GetMapping
-    public List<ExpenseResponse> getMyExpenses(
-            Authentication authentication){
+                String email = authentication.getName();
 
-        String email = authentication.getName();
-
-        return expenseService.getMyExpenses(email);
-    }
+                return expenseService.getMyExpenses(
+                        email,
+                        pageable
+                );
+            }
 
 //    Delete Expenses
     @DeleteMapping("/{id}")

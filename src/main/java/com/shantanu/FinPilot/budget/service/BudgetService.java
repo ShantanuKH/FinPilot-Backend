@@ -190,7 +190,7 @@ public List<BudgetAnalyticsResponse> getBudgetAnalytics(
             budgetRepository.findByUser(user);
 
     List<Expense> expenses =
-            expenseRepository.findByUser(user);
+            expenseRepository.findByUser(user, p);
 
     List<BudgetAnalyticsResponse> responses =
             new ArrayList<>();
