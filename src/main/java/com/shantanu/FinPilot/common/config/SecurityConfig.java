@@ -16,7 +16,9 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.io.IOException;
 import java.util.List;
+import jakarta.servlet.http.HttpServletResponse;
 
 @Configuration
 @RequiredArgsConstructor
@@ -64,9 +66,36 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**")
                         .permitAll()
 
+                        // Swagger UI
+                        .requestMatchers(
+                                "/swagger-ui/**",
+                                "/swagger-ui.html",
+                                "/v3/api-docs/**",
+                                "/v3/api-docs.yaml"
+                        ).permitAll()
+
                         // Every other API requires authentication
                         .anyRequest()
                         .authenticated()
+                )
+
+                // Return 401 instead of Spring Security's default 403
+                // when authentication is missing or invalid.
+                .exceptionHandling(exception ->
+                        exception.authenticationEntryPoint((request, response, authException) -> {
+
+                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                            response.setContentType("application/json");
+                            response.setCharacterEncoding("UTF-8");
+
+                            response.getWriter().write("""
+                                    {
+                                      "status": 401,
+                                      "error": "Unauthorized",
+                                      "message": "Authentication is required or the session has expired."
+                                    }
+                                    """);
+                        })
                 )
 
                 // Execute JWT Filter before UsernamePasswordAuthenticationFilter
@@ -82,7 +111,7 @@ public class SecurityConfig {
      * Global CORS Configuration
      *
      * This allows the React application
-     * running on localhost:5174
+     * running on localhost:5173
      * to communicate with Spring Boot.
      */
     @Bean

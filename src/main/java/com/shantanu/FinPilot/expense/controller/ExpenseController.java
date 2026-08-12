@@ -12,8 +12,10 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import com.shantanu.FinPilot.common.dto.PagedResponse;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 
-import java.util.List;
+import com.shantanu.FinPilot.expense.entity.ExpenseCategory;
 
 @RestController
 @RequestMapping("/api/expenses")
@@ -37,19 +39,27 @@ public class ExpenseController {
     }
 
     //    Get Expenses
-            @GetMapping
-            public PagedResponse<ExpenseResponse> getMyExpenses(
-                    Authentication authentication,
-                    Pageable pageable
-            ) {
+    @GetMapping
+    public PagedResponse<ExpenseResponse> getMyExpenses(
+            Authentication authentication,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) ExpenseCategory category,
+            @PageableDefault(
+                    sort = "expenseDate",
+                    direction = Sort.Direction.DESC
+            )
+            Pageable pageable
+    ) {
 
-                String email = authentication.getName();
+        String email = authentication.getName();
 
-                return expenseService.getMyExpenses(
-                        email,
-                        pageable
-                );
-            }
+        return expenseService.getMyExpenses(
+                email,
+                search,
+                category,
+                pageable
+        );
+    }
 
 //    Delete Expenses
     @DeleteMapping("/{id}")

@@ -24,7 +24,7 @@ public class UserController {
         return userService.getCurrentUserProfile(email);
     }
 
-    @PostMapping("/updateProfile")
+    @PutMapping("/me")
     public UserProfileResponse updateUserProfile(
             Authentication authentication,
             @Valid @RequestBody UpdateProfileRequest updateProfileRequest

@@ -1,6 +1,5 @@
 package com.shantanu.FinPilot.dashboard.service;
 
-
 import com.shantanu.FinPilot.common.exception.UserNotFoundException;
 import com.shantanu.FinPilot.dashboard.dto.BudgetHealthResponse;
 import com.shantanu.FinPilot.dashboard.dto.CategoryBreakdownResponse;
@@ -26,41 +25,73 @@ public class DashboardService {
     private final ExpenseRepository expenseRepository;
     private final UserRepository userRepository;
 
+    // =========================================================
+    // Helper Methods
+    // =========================================================
+
+    private User getUserByEmail(String email) {
+        return userRepository.findByEmail(email)
+                .orElseThrow(() ->
+                        new UserNotFoundException("User Not Found"));
+    }
+
+    private List<Expense> getUserExpenses(User user) {
+        return expenseRepository.findByUser(user);
+    }
+
+    private List<Expense> getCurrentMonthExpenses(
+            List<Expense> expenses
+    ) {
+        YearMonth currentMonth = YearMonth.now();
+
+        return expenses.stream()
+                .filter(expense ->
+                        YearMonth.from(expense.getExpenseDate())
+                                .equals(currentMonth)
+                )
+                .toList();
+    }
+
+    // =========================================================
+    // Dashboard Summary
+    // =========================================================
 
     public DashboardSummaryResponse getDashboardSummary(
             String email
     ) {
 
-//        Find User
-        User user = userRepository
-                .findByEmail(email)
-                .orElseThrow(
-                        ()->new UserNotFoundException(
-                                "User Not Found"
+        User user = getUserByEmail(email);
+
+        List<Expense> expenses =
+                getUserExpenses(user);
+
+        List<Expense> currentMonthExpenses =
+                getCurrentMonthExpenses(expenses);
+
+        Double totalExpenses =
+                currentMonthExpenses.stream()
+                        .mapToDouble(Expense::getAmount)
+                        .sum();
+
+        Long expenseCount =
+                (long) currentMonthExpenses.size();
+
+        Double highestExpense =
+                currentMonthExpenses.stream()
+                        .mapToDouble(Expense::getAmount)
+                        .max()
+                        .orElse(0.0);
+
+        Double averageExpense =
+                currentMonthExpenses.stream()
+                        .mapToDouble(Expense::getAmount)
+                        .average()
+                        .stream()
+                        .map(avg ->
+                                Math.round(avg * 100.0) / 100.0
                         )
-                );
-
-//        Get User's Expenses
-        List<Expense> expenses = expenseRepository
-                .findByUser(user);
-
-//        Calculate total expense
-        Double totalExpenses = expenses
-                .stream()
-                .mapToDouble(Expense::getAmount)
-                .sum();
-
-        Long expenseCount = (long) expenses.size();
-
-        Double highestExpense = expenses.stream()
-                .mapToDouble(Expense::getAmount)
-                .max()
-                .orElse(0.0);
-
-        Double averageExpense = expenses.stream()
-                .mapToDouble(Expense::getAmount)
-                .average()
-                .orElse(0.0);
+                        .findFirst()
+                        .orElse(0.0);
 
         return DashboardSummaryResponse.builder()
                 .totalExpenses(totalExpenses)
@@ -70,22 +101,25 @@ public class DashboardService {
                 .build();
     }
 
+    // =========================================================
+    // Category Breakdown
+    // =========================================================
+
     public List<CategoryBreakdownResponse> getCategoryBreakdown(
             String email
     ) {
-        User user = userRepository
-                .findByEmail(email)
-                .orElseThrow(
-                        () -> new UserNotFoundException(
-                                "User Not Found"
-                        )
-                );
+
+        User user = getUserByEmail(email);
 
         List<Expense> expenses =
-                expenseRepository.findByUser(user);
+                getUserExpenses(user);
+
+        // Only use current month's expenses
+        List<Expense> currentMonthExpenses =
+                getCurrentMonthExpenses(expenses);
 
         Map<ExpenseCategory, Double> categoryTotals =
-                expenses.stream()
+                currentMonthExpenses.stream()
                         .collect(
                                 Collectors.groupingBy(
                                         Expense::getCategory,
@@ -94,8 +128,15 @@ public class DashboardService {
                                         )
                                 )
                         );
+
         return categoryTotals.entrySet()
                 .stream()
+                .sorted(
+                        Map.Entry
+                                .<ExpenseCategory, Double>
+                                        comparingByValue()
+                                .reversed()
+                )
                 .map(entry ->
                         CategoryBreakdownResponse.builder()
                                 .category(entry.getKey())
@@ -105,68 +146,72 @@ public class DashboardService {
                 .toList();
     }
 
-//    Monthly Expenses
-        public List<MonthlySummaryResponse>
-        getMonthlySummary(
-                String email
-        ) {
-            User user = userRepository
-                    .findByEmail(email)
-                    .orElseThrow(
-                            () -> new UserNotFoundException(
-                                    "User Not Found"
-                            )
-                    );
-            List<Expense> expenses =
-                    expenseRepository.findByUser(user);
+    // =========================================================
+    // Monthly Summary
+    // =========================================================
 
-            Map<YearMonth, Double> monthlyTotals =
-                    expenses.stream()
-                            .collect(
-                                    Collectors.groupingBy(
-                                            expense ->
-                                                    YearMonth.from(
-                                                            expense.getExpenseDate()
-                                                    ),
-                                            Collectors.summingDouble(
-                                                    Expense::getAmount
-                                            )
-                                    )
-                            );
+    public List<MonthlySummaryResponse> getMonthlySummary(
+            String email
+    ) {
 
-            return monthlyTotals.entrySet()
-                    .stream()
-                    .map(entry ->
-                            MonthlySummaryResponse.builder()
-                                    .month(
-                                            entry.getKey().toString()
-                                    )
-                                    .totalAmount(
-                                            entry.getValue()
-                                    )
-                                    .build()
-                    )
-                    .toList();
+        User user = getUserByEmail(email);
 
+        List<Expense> expenses =
+                getUserExpenses(user);
 
-        }
+        /*
+         * Monthly Summary intentionally uses ALL expenses
+         * because this chart shows spending across months.
+         */
+
+        Map<YearMonth, Double> monthlyTotals =
+                expenses.stream()
+                        .collect(
+                                Collectors.groupingBy(
+                                        expense ->
+                                                YearMonth.from(
+                                                        expense.getExpenseDate()
+                                                ),
+                                        Collectors.summingDouble(
+                                                Expense::getAmount
+                                        )
+                                )
+                        );
+
+        return monthlyTotals.entrySet()
+                .stream()
+                .sorted(
+                        Map.Entry.comparingByKey()
+                )
+                .map(entry ->
+                        MonthlySummaryResponse.builder()
+                                .month(entry.getKey().toString())
+                                .totalAmount(entry.getValue())
+                                .build()
+                )
+                .toList();
+    }
+
+    // =========================================================
+    // Budget Health
+    // =========================================================
 
     public BudgetHealthResponse getBudgetHealth(
             String email
     ) {
-        User user = userRepository
-                .findByEmail(email)
-                .orElseThrow(
-                        () -> new UserNotFoundException(
-                                "User Not Found"
-                        )
-                );
-        List<Expense> expenses =
-                expenseRepository.findByUser(user);
 
-        Double totalExpenses = expenses.stream()
-                .mapToDouble(Expense::getAmount)
-                .sum();
+        User user = getUserByEmail(email);
+
+        List<Expense> expenses =
+                getUserExpenses(user);
+
+        List<Expense> currentMonthExpenses =
+                getCurrentMonthExpenses(expenses);
+
+        Double totalExpenses =
+                currentMonthExpenses.stream()
+                        .mapToDouble(Expense::getAmount)
+                        .sum();
 
         Double monthlyIncome =
                 user.getMonthlyIncome();
@@ -185,6 +230,5 @@ public class DashboardService {
                 .remainingAmount(remainingAmount)
                 .savingRate(savingRate)
                 .build();
-
     }
 }

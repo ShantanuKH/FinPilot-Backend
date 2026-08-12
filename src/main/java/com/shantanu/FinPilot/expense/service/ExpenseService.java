@@ -7,6 +7,7 @@ import com.shantanu.FinPilot.expense.dto.CreateExpenseRequest;
 import com.shantanu.FinPilot.expense.dto.ExpenseResponse;
 import com.shantanu.FinPilot.expense.dto.UpdateExpenseRequest;
 import com.shantanu.FinPilot.expense.entity.Expense;
+import com.shantanu.FinPilot.expense.entity.ExpenseCategory;
 import com.shantanu.FinPilot.expense.repository.ExpenseRepository;
 import com.shantanu.FinPilot.user.entity.User;
 import com.shantanu.FinPilot.user.repository.UserRepository;
@@ -16,6 +17,7 @@ import com.shantanu.FinPilot.common.dto.PagedResponse;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
 
@@ -61,6 +63,8 @@ public class ExpenseService {
 
     public PagedResponse<ExpenseResponse> getMyExpenses(
             String email,
+            String search,
+            ExpenseCategory category,
             Pageable pageable
     ){
 
@@ -71,11 +75,26 @@ public class ExpenseService {
                         )
                 );
 
-        Page<Expense> expenses =
-                expenseRepository.findByUser(
-                        user,
-                        pageable
-                );
+        Page<Expense> expenses;
+        if (category != null) {
+            expenses = expenseRepository.findByUserAndCategory(
+                    user,
+                    category,
+                    pageable
+            );
+        } else if (StringUtils.hasText(search)) {
+            expenses = expenseRepository.findByUserAndTitleContainingIgnoreCase(
+                    user,
+                    search.trim(),
+                    pageable
+            );
+        } else {
+            expenses = expenseRepository.findByUser(
+                    user,
+                    pageable
+            );
+        }
+
         List<ExpenseResponse> expenseResponses =
                 expenses.getContent()
                         .stream()

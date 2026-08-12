@@ -1,6 +1,7 @@
 package com.shantanu.FinPilot.common.security;
 
 import com.shantanu.FinPilot.auth.service.CustomDetailsService;
+import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -23,43 +24,61 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     @Override
     protected void doFilterInternal(
-            HttpServletRequest servletRequest,
-            HttpServletResponse servletResponse,
-            FilterChain filterChain) throws ServletException, IOException {
+            HttpServletRequest request,
+            HttpServletResponse response,
+            FilterChain filterChain
+    ) throws ServletException, IOException {
 
-        String authHeader = servletRequest.getHeader("Authorization");
+        String path = request.getServletPath();
 
-        if (authHeader == null ||
-                !authHeader.startsWith("Bearer ")) {
+        // Skip JWT validation for public endpoints
+        if (path.startsWith("/api/auth")
+                || path.startsWith("/swagger-ui")
+                || path.startsWith("/v3/api-docs")) {
 
-            filterChain.doFilter(servletRequest, servletResponse);
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        String authHeader = request.getHeader("Authorization");
+
+        // No JWT present
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            filterChain.doFilter(request, response);
             return;
         }
 
         String jwt = authHeader.substring(7);
-        String email = jwtService.extractUsername(jwt);
 
-        if (email != null &&
-                SecurityContextHolder.getContext()
-                        .getAuthentication() == null) {
+        try {
 
-            UserDetails userDetails =
-                    customDetailsService
-                            .loadUserByUsername(email);
-            if (jwtService.isTokenValid(jwt, userDetails)) {
+            String email = jwtService.extractUsername(jwt);
 
-                UsernamePasswordAuthenticationToken authToken =
-                        new UsernamePasswordAuthenticationToken(
-                                userDetails,
-                                null,
-                                userDetails.getAuthorities()
-                        );
-                SecurityContextHolder.getContext()
-                        .setAuthentication(authToken);
+            if (email != null
+                    && SecurityContextHolder.getContext().getAuthentication() == null) {
 
+                UserDetails userDetails =
+                        customDetailsService.loadUserByUsername(email);
+
+                if (jwtService.isTokenValid(jwt, userDetails)) {
+
+                    UsernamePasswordAuthenticationToken authentication =
+                            new UsernamePasswordAuthenticationToken(
+                                    userDetails,
+                                    null,
+                                    userDetails.getAuthorities()
+                            );
+
+                    SecurityContextHolder.getContext()
+                            .setAuthentication(authentication);
+                }
             }
+
+        } catch (JwtException e) {
+            // Invalid, expired, malformed, or unsupported JWT.
+            // Continue without authentication.
         }
 
-        filterChain.doFilter(servletRequest, servletResponse);
+        filterChain.doFilter(request, response);
     }
 }

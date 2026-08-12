@@ -1,5 +1,7 @@
 package com.shantanu.FinPilot.investment.service;
 
+import com.shantanu.FinPilot.common.exception.InvestmentNotFoundException;
+import com.shantanu.FinPilot.common.exception.UnauthorizedInvestmentAccessException;
 import com.shantanu.FinPilot.common.exception.UserNotFoundException;
 import com.shantanu.FinPilot.investment.dto.*;
 import com.shantanu.FinPilot.investment.entity.Investment;
@@ -13,7 +15,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -23,17 +24,45 @@ public class InvestmentService {
     private final UserRepository userRepository;
     private final InvestmentRepository investmentRepository;
 
+    private User getUserByEmail(String email) {
+        return userRepository.findByEmail(email)
+                .orElseThrow(() ->
+                        new UserNotFoundException(
+                                "User Not Found"
+                        ));
+    }
+
+    private List<Investment> getUserInvestments(User user) {
+        return investmentRepository.findByUser(user);
+    }
+
+    private Investment getInvestmentById(Long investmentId) {
+        return investmentRepository.findById(investmentId)
+                .orElseThrow(() ->
+                        new InvestmentNotFoundException(
+                                "Investment Not Found"
+                        ));
+    }
+
+    private void validateInvestmentOwnership(
+            User currentUser,
+            Investment investment
+    ) {
+        if (!investment.getUser()
+                .getId()
+                .equals(currentUser.getId())) {
+
+            throw new UnauthorizedInvestmentAccessException(
+                    "You are not authorized to access this investment"
+            );
+        }
+    }
+
     public InvestmentResponse createInvestment(
             String email,
             CreateInvestmentRequest createInvestmentRequest
     ){
-        User user = userRepository
-                .findByEmail(email)
-                .orElseThrow(
-                        () -> new UserNotFoundException(
-                                "User Not Found"
-                        )
-                );
+        User user = getUserByEmail(email);
 
         Investment investment =
                 Investment.builder()
@@ -75,16 +104,10 @@ public class InvestmentService {
 
     public List<InvestmentResponse> getMyInvestments( String email){
 
-        User user = userRepository
-                .findByEmail(email)
-                .orElseThrow(
-                        () -> new UserNotFoundException(
-                                "User Not Found"
-                        )
-                );
+        User user = getUserByEmail(email);
 
-        List<Investment> investments = investmentRepository.findByUser(user);
-
+        List<Investment> investments =
+                getUserInvestments(user);
 
         return investments.stream()
                 .map(investment ->
@@ -112,28 +135,15 @@ public class InvestmentService {
             String email,
             UpdateInvestmentRequest request
     ){
-        User currentUser = userRepository
-                .findByEmail(email)
-                .orElseThrow(
-                        ()-> new UserNotFoundException("User Not Found")
-                );
+        User currentUser = getUserByEmail(email);
 
         Investment investment =
-                investmentRepository.findById(investmentId)
-                        .orElseThrow(
-                                () -> new RuntimeException(
-                                        "Investment Not Found"
-                                )
-                        );
+                getInvestmentById(investmentId);
 
-        if (!investment.getUser()
-                .getId()
-                .equals(currentUser.getId())) {
-
-            throw new RuntimeException(
-                    "You are not authorized to update this investment"
-            );
-        }
+        validateInvestmentOwnership(
+                currentUser,
+                investment
+        );
         investment.setName(
                 request.getName()
         );
@@ -175,49 +185,27 @@ public class InvestmentService {
             Long investmentId,
             String email
     ){
-        User currentUser = userRepository
-                .findByEmail(email)
-                .orElseThrow(
-                        () -> new UserNotFoundException(
-                                "User Not Found"
-                        )
-                );
+        User currentUser = getUserByEmail(email);
 
         Investment investment =
-                investmentRepository.findById(
-                                investmentId
-                        )
-                        .orElseThrow(
-                                () -> new RuntimeException(
-                                        "Investment Not Found"
-                                )
-                        );
+                getInvestmentById(investmentId);
 
-        if (!investment.getUser()
-                .getId()
-                .equals(currentUser.getId())) {
-
-            throw new RuntimeException(
-                    "You are not authorized to delete this investment"
-            );
-        }
+        validateInvestmentOwnership(
+                currentUser,
+                investment
+        );
 
         investmentRepository.delete(investment);
+
     }
 
     public InvestmentSummaryResponse getInvestmentSummary(
             String email
     ){
-        User user = userRepository
-                .findByEmail(email)
-                .orElseThrow(
-                        () -> new UserNotFoundException(
-                                "User Not Found"
-                        )
-                );
+        User user = getUserByEmail(email);
 
         List<Investment> investments =
-                investmentRepository.findByUser(user);
+                getUserInvestments(user);
 
         Double totalInvestment =
                 investments.stream()
@@ -255,57 +243,49 @@ public class InvestmentService {
 
     public List<PortfolioAllocationResponse> getPortfolioAllocation(
             String email
-    ){
-        User user = userRepository
-                .findByEmail(email)
-                .orElseThrow(
-                        () -> new UserNotFoundException(
-                                "User Not Found"
-                        )
-                );
+    ) {
+        User user = getUserByEmail(email);
 
         List<Investment> investments =
-                investmentRepository.findByUser(user);
+                getUserInvestments(user);
 
         Double totalInvestment =
                 investments.stream()
-                        .mapToDouble(
-                                Investment::getAmount
-                        )
+                        .mapToDouble(Investment::getAmount)
                         .sum();
 
         Map<InvestmentType, Double> allocationMap =
                 investments.stream()
                         .collect(
-                                Collectors.groupingBy(Investment::getInvestmentType, Collectors.summingDouble(Investment::getAmount))
+                                Collectors.groupingBy(
+                                        Investment::getInvestmentType,
+                                        Collectors.summingDouble(
+                                                Investment::getAmount
+                                        )
+                                )
                         );
 
         return allocationMap.entrySet()
                 .stream()
+                .sorted(
+                        Map.Entry
+                                .<InvestmentType, Double>comparingByValue()
+                                .reversed()
+                )
                 .map(entry -> {
 
                     Double percentage =
                             totalInvestment > 0
-                                    ? (entry.getValue()
-                                    / totalInvestment) * 100
+                                    ? (entry.getValue() / totalInvestment) * 100
                                     : 0.0;
 
                     percentage =
-                            Math.round(
-                                    percentage * 100.0
-                            ) / 100.0;
+                            Math.round(percentage * 100.0) / 100.0;
 
-                    return PortfolioAllocationResponse
-                            .builder()
-                            .investmentType(
-                                    entry.getKey()
-                            )
-                            .amount(
-                                    entry.getValue()
-                            )
-                            .percentage(
-                                    percentage
-                            )
+                    return PortfolioAllocationResponse.builder()
+                            .investmentType(entry.getKey())
+                            .amount(entry.getValue())
+                            .percentage(percentage)
                             .build();
                 })
                 .toList();
@@ -314,16 +294,10 @@ public class InvestmentService {
 
     public InvestmentRiskAnalysisResponse getRiskAnalysis(String email)
     {
-        User user = userRepository
-                .findByEmail(email)
-                .orElseThrow(
-                        () -> new UserNotFoundException(
-                                "User Not Found"
-                        )
-                );
+        User user = getUserByEmail(email);
 
         List<Investment> investments =
-                investmentRepository.findByUser(user);
+                getUserInvestments(user);
 
         Double totalInvestment =
                 investments.stream()

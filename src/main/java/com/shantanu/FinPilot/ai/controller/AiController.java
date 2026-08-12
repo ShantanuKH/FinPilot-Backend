@@ -5,6 +5,7 @@ import com.shantanu.FinPilot.ai.dto.chat.AiChatRequest;
 import com.shantanu.FinPilot.ai.dto.chat.AiChatResponse;
 import com.shantanu.FinPilot.ai.service.AiChatService;
 import com.shantanu.FinPilot.ai.service.AiFinancialAdviceService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -36,13 +37,14 @@ public class AiController {
     }
 
     @PostMapping("/chat")
-    public ResponseEntity<AiChatResponse> chatService(
-            Authentication authentication, @RequestBody AiChatRequest aiChatRequest) {
+    public ResponseEntity<AiChatResponse> chat(
+            Authentication authentication,
+            @Valid @RequestBody AiChatRequest request) {
 
         return ResponseEntity.ok(
                 aiChatService.chat(
                         authentication.getName(),
-                        aiChatRequest
+                        request
                 )
         );
     }

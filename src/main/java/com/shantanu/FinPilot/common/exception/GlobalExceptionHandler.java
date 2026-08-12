@@ -241,4 +241,51 @@ public class GlobalExceptionHandler {
                 .status(HttpStatus.FORBIDDEN)
                 .body(error);
     }
+
+    @ExceptionHandler(
+            InvestmentNotFoundException.class
+    )
+    public ResponseEntity<ErrorResponse>
+    handleInvestmentNotFoundException(
+            InvestmentNotFoundException ex,
+            HttpServletRequest request
+    ) {
+
+        ErrorResponse error =
+                new ErrorResponse(
+                        LocalDateTime.now(),
+                        HttpStatus.NOT_FOUND.value(),
+                        "NOT_FOUND",
+                        ex.getMessage(),
+                        request.getRequestURI()
+                );
+
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(error);
+    }
+
+    @ExceptionHandler(
+            UnauthorizedInvestmentAccessException.class
+    )
+    public ResponseEntity<ErrorResponse>
+    handleUnauthorizedInvestmentAccessException(
+            UnauthorizedInvestmentAccessException ex,
+            HttpServletRequest request
+    ) {
+
+        ErrorResponse error =
+                new ErrorResponse(
+                        LocalDateTime.now(),
+                        HttpStatus.FORBIDDEN.value(),
+                        "FORBIDDEN",
+                        ex.getMessage(),
+                        request.getRequestURI()
+                );
+
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .body(error);
+    }
 }
+

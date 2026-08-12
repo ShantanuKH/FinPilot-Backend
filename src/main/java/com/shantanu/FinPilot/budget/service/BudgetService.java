@@ -7,10 +7,12 @@ import com.shantanu.FinPilot.budget.dto.UpdateBudgetRequest;
 import com.shantanu.FinPilot.budget.entity.Budget;
 import com.shantanu.FinPilot.budget.entity.BudgetStatus;
 import com.shantanu.FinPilot.budget.respository.BudgetRepository;
+import com.shantanu.FinPilot.common.exception.BudgetAlreadyExistsException;
 import com.shantanu.FinPilot.common.exception.BudgetNotFoundException;
 import com.shantanu.FinPilot.common.exception.UnauthorizedBudgetAccessException;
 import com.shantanu.FinPilot.common.exception.UserNotFoundException;
 import com.shantanu.FinPilot.expense.entity.Expense;
+import com.shantanu.FinPilot.expense.entity.ExpenseCategory;
 import com.shantanu.FinPilot.expense.repository.ExpenseRepository;
 import com.shantanu.FinPilot.user.entity.User;
 import com.shantanu.FinPilot.user.repository.UserRepository;
@@ -19,6 +21,9 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -35,11 +40,17 @@ public class BudgetService {
     ){
         User user = userRepository
                 .findByEmail(email)
-                .orElseThrow(
-                        () -> new UserNotFoundException(
-                                "User Not Found"
-                        )
-                );
+                .orElseThrow(() -> new UserNotFoundException("User Not Found"));
+
+        budgetRepository.findByUserAndCategoryAndMonth(
+                user,
+                createBudgetRequest.getCategory(),
+                createBudgetRequest.getMonth()
+        ).ifPresent(existingBudget -> {
+            throw new BudgetAlreadyExistsException(
+                    "Budget already exists for this category and month"
+            );
+        });
 
         Budget budget = Budget.builder()
                 .category(createBudgetRequest.getCategory())
@@ -48,8 +59,7 @@ public class BudgetService {
                 .user(user)
                 .build();
 
-        Budget savedBudget =
-                budgetRepository.save(budget);
+        Budget savedBudget = budgetRepository.save(budget);
 
         return BudgetResponse.builder()
                 .id(savedBudget.getId())
@@ -108,6 +118,7 @@ public class BudgetService {
                         )
                 );
 
+
         if (!budget.getUser().getId()
                 .equals(currentUser.getId())) {
 
@@ -115,8 +126,23 @@ public class BudgetService {
                     "You are not authorized to update this budget"
             );
 
-
         }
+
+        Optional<Budget> existingBudget =
+                budgetRepository.findByUserAndCategoryAndMonth(
+                        currentUser,
+                        request.getCategory(),
+                        request.getMonth()
+                );
+
+        if (existingBudget.isPresent()
+                && !existingBudget.get().getId().equals(budget.getId())) {
+
+            throw new BudgetAlreadyExistsException(
+                    "Budget already exists for this category and month"
+            );
+        }
+
         budget.setCategory(
                 request.getCategory()
         );
@@ -190,25 +216,29 @@ public List<BudgetAnalyticsResponse> getBudgetAnalytics(
             budgetRepository.findByUser(user);
 
     List<Expense> expenses =
-            expenseRepository.findByUser(user, p);
+            expenseRepository.findByUser(user);
 
+
+    Map<ExpenseCategory, Double> expensesByCategory =
+            expenses.stream()
+                    .collect(
+                            Collectors.groupingBy(
+                                    Expense::getCategory,
+                                    Collectors.summingDouble(
+                                            Expense::getAmount
+                                    )
+                            )
+                    );
     List<BudgetAnalyticsResponse> responses =
             new ArrayList<>();
 
     for (Budget budget : budgets) {
 
         Double spentAmount =
-                expenses.stream()
-                        .filter(expense ->
-                                expense.getCategory()
-                                        .equals(
-                                                budget.getCategory()
-                                        )
-                        )
-                        .mapToDouble(
-                                Expense::getAmount
-                        )
-                        .sum();
+                expensesByCategory.getOrDefault(
+                        budget.getCategory(),
+                        0.0
+                );
 
         Double remainingAmount =
                 budget.getBudgetAmount()

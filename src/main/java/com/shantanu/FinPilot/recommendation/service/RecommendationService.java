@@ -5,6 +5,7 @@ import com.shantanu.FinPilot.budget.entity.Budget;
 import com.shantanu.FinPilot.budget.respository.BudgetRepository;
 import com.shantanu.FinPilot.common.exception.UserNotFoundException;
 import com.shantanu.FinPilot.expense.entity.Expense;
+import com.shantanu.FinPilot.expense.entity.ExpenseCategory;
 import com.shantanu.FinPilot.expense.repository.ExpenseRepository;
 import com.shantanu.FinPilot.investment.entity.Investment;
 import com.shantanu.FinPilot.investment.entity.InvestmentType;
@@ -30,89 +31,251 @@ public class RecommendationService {
     private final BudgetRepository budgetRepository;
     private final InvestmentRepository investmentRepository;
 
+// Recommendation Thresholds
+    // Savings Rate (%)
+    private static final double LOW_SAVINGS_RATE = 10.0;
+    private static final double RECOMMENDED_SAVINGS_RATE = 20.0;
+
+    // Portfolio Risk (%)
+    private static final double MODERATE_RISK_THRESHOLD = 30.0;
+    private static final double HIGH_RISK_THRESHOLD = 60.0;
+
+    // Diversification (%)
+    private static final double DIVERSIFICATION_THRESHOLD = 70.0;
+
+    // Budget Usage (%)
+    private static final double BUDGET_WARNING_THRESHOLD = 80.0;
+    private static final double BUDGET_EXCEEDED_THRESHOLD = 100.0;
+
+    // Emergency Fund
+    private static final double EMERGENCY_FUND_SAVINGS_THRESHOLD = 0.20;
+
+    private User getUserByEmail(String email) {
+        return userRepository.findByEmail(email)
+                .orElseThrow(() ->
+                        new UserNotFoundException(
+                                "User Not Found"
+                        ));
+    }
+
+    private List<Expense> getUserExpenses(User user) {
+        return expenseRepository.findByUser(user);
+    }
+
+    private List<Budget> getUserBudgets(User user) {
+        return budgetRepository.findByUser(user);
+    }
+
+    private List<Investment> getUserInvestments(User user) {
+        return investmentRepository.findByUser(user);
+    }
+
+    private Double calculateTotalExpenses(
+            List<Expense> expenses
+    ) {
+        return expenses.stream()
+                .mapToDouble(Expense::getAmount)
+                .sum();
+    }
+
+    private Double calculateMonthlySavings(
+            User user,
+            List<Expense> expenses
+    ) {
+        return user.getMonthlyIncome()
+                - calculateTotalExpenses(expenses);
+    }
+
+    private Double calculateSavingsRate(
+            User user,
+            List<Expense> expenses
+    ) {
+        Double monthlyIncome = user.getMonthlyIncome();
+
+        if (monthlyIncome <= 0) {
+            return 0.0;
+        }
+
+        return (calculateMonthlySavings(user, expenses)
+                / monthlyIncome) * 100;
+    }
+
+    /**
+     * Groups all expenses by category.
+     *
+     * @param expenses User's expenses.
+     * @return Map containing the total expense for each category.
+     */
+    private Map<ExpenseCategory, Double> getExpensesByCategory(
+            List<Expense> expenses
+    ) {
+
+        return expenses.stream()
+                .collect(
+                        Collectors.groupingBy(
+                                Expense::getCategory,
+                                Collectors.summingDouble(
+                                        Expense::getAmount
+                                )
+                        )
+                );
+    }
 
 
-    public RecommendationResponse getRecommendations(String email) {
+    /**
+     * Generates personalized financial recommendations for the authenticated user.
+     *
+     * @param email Email of the authenticated user.
+     * @return RecommendationResponse containing all financial recommendations.
+     */
+    public RecommendationResponse getRecommendations(
+            String email
+    ) {
 
-        List<String> recommendations = generateRecommendations(email);
+        List<String> recommendations =
+                generateRecommendations(email);
 
         return RecommendationResponse.builder()
                 .recommendations(recommendations)
                 .build();
     }
 
-    public List<String> generateRecommendations(String email) {
+    /**
+     * Generates all financial recommendations for the user by
+     * analysing expenses, budgets and investments.
+     *
+     * @param email Email of the authenticated user.
+     * @return List of personalized financial recommendations.
+     */
+    public List<String> generateRecommendations(
+            String email
+    ) {
 
-        User user = userRepository
-                .findByEmail(email)
-                .orElseThrow(() ->
-                        new UserNotFoundException("User Not Found"));
+        User user = getUserByEmail(email);
 
         List<Expense> expenses =
-                expenseRepository.findByUser(user);
+                getUserExpenses(user);
 
         List<Budget> budgets =
-                budgetRepository.findByUser(user);
+                getUserBudgets(user);
 
         List<Investment> investments =
-                investmentRepository.findByUser(user);
+                getUserInvestments(user);
 
-        List<String> recommendations = new ArrayList<>();
+        // Group expenses by category once.
+        // This avoids scanning the expense list for every budget.
+        Map<ExpenseCategory, Double> expensesByCategory =
+                getExpensesByCategory(expenses);
 
-        addSavingsRecommendation(recommendations, user, expenses);
+        List<String> recommendations =
+                new ArrayList<>();
 
-        addInvestmentRiskRecommendation(recommendations, user, investments);
+        // Savings analysis
+        addSavingsRecommendation(
+                recommendations,
+                user,
+                expenses
+        );
 
-        addBudgetRecommendation(recommendations, budgets, expenses);
+        // Investment risk analysis
+        addInvestmentRiskRecommendation(
+                recommendations,
+                user,
+                investments
+        );
 
-        addDiversificationRecommendation(recommendations, investments);
+        // Budget analysis
+        addBudgetRecommendation(
+                recommendations,
+                budgets,
+                expensesByCategory
+        );
 
-        addEmergencyFundRecommendation(recommendations, user, expenses);
+        // Portfolio diversification analysis
+        addDiversificationRecommendation(
+                recommendations,
+                investments
+        );
+
+        // Emergency fund analysis
+        addEmergencyFundRecommendation(
+                recommendations,
+                user,
+                expenses
+        );
 
         return recommendations;
     }
 
-    public AiFinancialContext buildFinancialContext(String email) {
+    /**
+     * Builds the financial context required by the AI module
+     * to generate personalized financial insights.
+     *
+     * @param email Email of the authenticated user.
+     * @return AI financial context containing financial metrics and recommendations.
+     */
+    public AiFinancialContext buildFinancialContext(
+            String email
+    ) {
 
-        User user = userRepository
-                .findByEmail(email)
-                .orElseThrow(() ->
-                        new UserNotFoundException("User Not Found"));
+        User user = getUserByEmail(email);
 
         List<Expense> expenses =
-                expenseRepository.findByUser(user);
+                getUserExpenses(user);
 
         List<Budget> budgets =
-                budgetRepository.findByUser(user);
+                getUserBudgets(user);
 
         List<Investment> investments =
-                investmentRepository.findByUser(user);
+                getUserInvestments(user);
 
-        Double monthlyIncome = user.getMonthlyIncome();
+        Double monthlyIncome =
+                user.getMonthlyIncome();
 
-        Double totalExpenses = expenses.stream()
-                .mapToDouble(Expense::getAmount)
-                .sum();
+        // Reuse helper methods instead of duplicating calculations.
+        Double totalExpenses =
+                calculateTotalExpenses(expenses);
 
         Double monthlySavings =
-                monthlyIncome - totalExpenses;
+                calculateMonthlySavings(user, expenses);
 
         Double savingsRate =
-                monthlyIncome > 0
-                        ? (monthlySavings / monthlyIncome) * 100
-                        : 0.0;
+                calculateSavingsRate(user, expenses);
 
-        List<String> recommendations = new ArrayList<>();
+        Map<ExpenseCategory, Double> expensesByCategory =
+                getExpensesByCategory(expenses);
 
-        addSavingsRecommendation(recommendations, user, expenses);
+        List<String> recommendations =
+                new ArrayList<>();
 
-        addInvestmentRiskRecommendation(recommendations, user, investments);
+        addSavingsRecommendation(
+                recommendations,
+                user,
+                expenses
+        );
 
-        addBudgetRecommendation(recommendations, budgets, expenses);
+        addInvestmentRiskRecommendation(
+                recommendations,
+                user,
+                investments
+        );
 
-        addDiversificationRecommendation(recommendations, investments);
+        addBudgetRecommendation(
+                recommendations,
+                budgets,
+                expensesByCategory
+        );
 
-        addEmergencyFundRecommendation(recommendations, user, expenses);
+        addDiversificationRecommendation(
+                recommendations,
+                investments
+        );
+
+        addEmergencyFundRecommendation(
+                recommendations,
+                user,
+                expenses
+        );
 
         return AiFinancialContext.builder()
                 .monthlyIncome(monthlyIncome)
@@ -125,35 +288,29 @@ public class RecommendationService {
     }
 
 
-    public void addSavingsRecommendation(
+    /**
+     * Generates savings recommendations based on the user's savings rate.
+     *
+     * @param recommendations List of recommendations to be updated.
+     * @param user Authenticated user.
+     * @param expenses User's expenses.
+     */
+    private void addSavingsRecommendation(
             List<String> recommendations,
             User user,
             List<Expense> expenses
-    ){
-        Double monthlyIncome = user.getMonthlyIncome();
-
-        Double totalExpense = expenses.stream()
-                .mapToDouble(
-                        Expense::getAmount
-                )
-                .sum();
-
-
-        Double monthlySavings =
-                monthlyIncome - totalExpense;
+    ) {
 
         Double savingsRate =
-                monthlyIncome > 0
-                        ? (monthlySavings / monthlyIncome) * 100
-                        : 0.0;
+                calculateSavingsRate(user, expenses);
 
-        if (savingsRate < 10) {
+        if (savingsRate < LOW_SAVINGS_RATE) {
 
             recommendations.add(
                     "Your savings rate is very low. Reduce unnecessary expenses and aim to save at least 20% of your monthly income."
             );
 
-        } else if (savingsRate < 20) {
+        } else if (savingsRate < RECOMMENDED_SAVINGS_RATE) {
 
             recommendations.add(
                     "Your savings rate is below the recommended level. Try increasing your monthly savings."
@@ -165,9 +322,16 @@ public class RecommendationService {
                     "Great job! Your savings rate is healthy. Keep investing consistently."
             );
         }
-
     }
 
+    /**
+     * Compares the user's portfolio risk with their selected risk profile
+     * and generates appropriate investment recommendations.
+     *
+     * @param recommendations List of recommendations to be updated.
+     * @param user Authenticated user.
+     * @param investments User's investment portfolio.
+     */
     private void addInvestmentRiskRecommendation(
             List<String> recommendations,
             User user,
@@ -179,12 +343,9 @@ public class RecommendationService {
         for (Investment investment : investments) {
 
             if (investment.getInvestmentType() == InvestmentType.STOCK
-                    ||
-                    investment.getInvestmentType() == InvestmentType.CRYPTO) {
+                    || investment.getInvestmentType() == InvestmentType.CRYPTO) {
 
-                highRiskAmount =
-                        highRiskAmount +
-                                investment.getAmount();
+                highRiskAmount += investment.getAmount();
             }
         }
 
@@ -193,20 +354,24 @@ public class RecommendationService {
                 .sum();
 
         Double highRiskPercentage =
-                totalInvestment > 0 ?
-                        (highRiskAmount / totalInvestment) * 100
+                totalInvestment > 0
+                        ? (highRiskAmount / totalInvestment) * 100
                         : 0.0;
 
         RiskProfile portfolioRisk;
 
-        if (highRiskPercentage > 60) {
+        if (highRiskPercentage > HIGH_RISK_THRESHOLD) {
+
             portfolioRisk = RiskProfile.HIGH;
-        } else if (highRiskPercentage >= 30) {
+
+        } else if (highRiskPercentage >= MODERATE_RISK_THRESHOLD) {
+
             portfolioRisk = RiskProfile.MODERATE;
+
         } else {
+
             portfolioRisk = RiskProfile.LOW;
         }
-
 
         RiskProfile userRiskProfile = user.getRiskProfile();
 
@@ -228,34 +393,36 @@ public class RecommendationService {
                     "Your portfolio is more conservative than your selected risk profile. If it aligns with your financial goals, you may consider increasing exposure to growth-oriented investments."
             );
         }
-
     }
 
+    /**
+     * Compares actual spending against each budget
+     * and generates budget-related recommendations.
+     *
+     * @param recommendations List of recommendations to be updated.
+     * @param budgets User's budgets.
+     * @param expensesByCategory Total expenses grouped by category.
+     */
     private void addBudgetRecommendation(
             List<String> recommendations,
             List<Budget> budgets,
-            List<Expense> expenses
-    ){
-
+            Map<ExpenseCategory, Double> expensesByCategory
+    ) {
 
         for (Budget budget : budgets) {
 
-            Double spentAmount = expenses.stream()
-                    .filter(expense ->
-                            expense.getCategory()
-                                    .equals(budget.getCategory())
-                    )
-                    .mapToDouble(Expense::getAmount)
-                    .sum();
+            Double spentAmount =
+                    expensesByCategory.getOrDefault(
+                            budget.getCategory(),
+                            0.0
+                    );
 
             Double usagePercentage =
                     budget.getBudgetAmount() > 0
                             ? (spentAmount / budget.getBudgetAmount()) * 100
                             : 0.0;
 
-
-
-            if (usagePercentage > 100) {
+            if (usagePercentage > BUDGET_EXCEEDED_THRESHOLD) {
 
                 recommendations.add(
                         "You have exceeded your "
@@ -263,7 +430,7 @@ public class RecommendationService {
                                 + " budget. Consider reducing expenses in this category."
                 );
 
-            } else if (usagePercentage >= 80) {
+            } else if (usagePercentage >= BUDGET_WARNING_THRESHOLD) {
 
                 recommendations.add(
                         "You are close to exceeding your "
@@ -278,25 +445,26 @@ public class RecommendationService {
                                 + budget.getCategory()
                                 + " budget well."
                 );
-
             }
-
-
         }
-
     }
 
+
+    /**
+     * Analyses the user's investment portfolio and checks whether
+     * it is sufficiently diversified across different investment types.
+     *
+     * @param recommendations List of recommendations to be updated.
+     * @param investments User's investment portfolio.
+     */
     private void addDiversificationRecommendation(
             List<String> recommendations,
             List<Investment> investments
-    ){
+    ) {
 
-        Double totalInvestment =
-                investments.stream()
-                        .mapToDouble(
-                                Investment::getAmount
-                        )
-                        .sum();
+        Double totalInvestment = investments.stream()
+                .mapToDouble(Investment::getAmount)
+                .sum();
 
         Map<InvestmentType, Double> investmentAllocation =
                 investments.stream()
@@ -319,7 +487,7 @@ public class RecommendationService {
                             ? (entry.getValue() / totalInvestment) * 100
                             : 0.0;
 
-            if (investmentPercentage > 70) {
+            if (investmentPercentage > DIVERSIFICATION_THRESHOLD) {
 
                 recommendations.add(
                         "Your portfolio is highly concentrated in "
@@ -337,24 +505,26 @@ public class RecommendationService {
                     "Great job! Your investment portfolio is well diversified across multiple asset classes."
             );
         }
-
     }
-
-
+    /**
+     * Generates recommendations for building and maintaining
+     * an emergency fund based on the user's monthly savings.
+     *
+     * @param recommendations List of recommendations to be updated.
+     * @param user Authenticated user.
+     * @param expenses User's expenses.
+     */
     private void addEmergencyFundRecommendation(
             List<String> recommendations,
             User user,
             List<Expense> expenses
     ) {
 
-        Double totalExpense = expenses.stream()
-                .mapToDouble(Expense::getAmount)
-                .sum();
-
-        Double monthlyIncome = user.getMonthlyIncome();
+        Double monthlyIncome =
+                user.getMonthlyIncome();
 
         Double monthlySavings =
-                monthlyIncome - totalExpense;
+                calculateMonthlySavings(user, expenses);
 
         if (monthlySavings <= 0) {
 
@@ -362,10 +532,11 @@ public class RecommendationService {
                     "Your current expenses leave little or no room for savings. Try reducing non-essential expenses before building an emergency fund."
             );
 
-        } else if (monthlySavings < (monthlyIncome * 0.20)) {
+        } else if (monthlySavings <
+                (monthlyIncome * EMERGENCY_FUND_SAVINGS_THRESHOLD)) {
 
             recommendations.add(
-                    "Consider increasing your monthly savings and build an emergency fund covering at least 3 to 6 months of your expenses."
+                    "Consider increasing your monthly savings and build an emergency fund covering at least 3 to 6 months of expenses."
             );
 
         } else {
@@ -375,4 +546,7 @@ public class RecommendationService {
             );
         }
     }
+
+
+
 }

@@ -13,7 +13,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -22,16 +21,36 @@ public class ProfileService {
     private final UserRepository userRepository;
     private final ExpenseRepository expenseRepository;
 
-    public ProfileResponse getProfile(
+    // Financial Health Thresholds
+    private static final double EXCELLENT_SAVINGS_RATE = 50.0;
+    private static final double GOOD_SAVINGS_RATE = 20.0;
+
+    /**
+     * Returns the authenticated user.
+     *
+     * @param email Authenticated user's email.
+     * @return User entity.
+     */
+    private User getUserByEmail(
             String email
     ) {
-        User user = userRepository
-                .findByEmail(email)
-                .orElseThrow(
-                        () -> new UserNotFoundException(
-                                "User Not Found"
-                        )
-                );
+
+        return userRepository.findByEmail(email)
+                .orElseThrow(() ->
+                        new UserNotFoundException(
+                                "User not found with email: " + email
+                        ));
+    }
+
+    /**
+     * Builds the profile response.
+     *
+     * @param user User entity.
+     * @return Profile response.
+     */
+    private ProfileResponse buildProfileResponse(
+            User user
+    ) {
 
         return ProfileResponse.builder()
                 .firstName(user.getFirstName())
@@ -43,87 +62,135 @@ public class ProfileService {
                 .build();
     }
 
+    /**
+     * Calculates total expenses.
+     *
+     * @param expenses User expenses.
+     * @return Total expenses.
+     */
+    private double calculateTotalExpenses(
+            List<Expense> expenses
+    ) {
+
+        return expenses.stream()
+                .mapToDouble(Expense::getAmount)
+                .sum();
+    }
+
+    /**
+     * Calculates monthly savings.
+     *
+     * @param user User.
+     * @param expenses User expenses.
+     * @return Monthly savings.
+     */
+    private double calculateMonthlySavings(
+            User user,
+            List<Expense> expenses
+    ) {
+
+        return user.getMonthlyIncome()
+                - calculateTotalExpenses(expenses);
+    }
+
+    /**
+     * Calculates savings rate.
+     *
+     * @param user User.
+     * @param expenses User expenses.
+     * @return Savings rate.
+     */
+    private double calculateSavingsRate(
+            User user,
+            List<Expense> expenses
+    ) {
+
+        double monthlyIncome = user.getMonthlyIncome();
+
+        if (monthlyIncome <= 0) {
+            return 0.0;
+        }
+
+        double savingsRate =
+                (calculateMonthlySavings(user, expenses)
+                        / monthlyIncome) * 100;
+
+        return Math.round(savingsRate * 100.0) / 100.0;
+    }
+
+    /**
+     * Returns the authenticated user's profile.
+     *
+     * @param email Authenticated user's email.
+     * @return User profile.
+     */
+    public ProfileResponse getProfile(
+            String email
+    ) {
+
+        User user = getUserByEmail(email);
+
+        return buildProfileResponse(user);
+    }
+
+    /**
+     * Updates the authenticated user's profile.
+     *
+     * @param email Authenticated user's email.
+     * @param request Updated profile details.
+     * @return Updated profile.
+     */
     public ProfileResponse updateProfile(
             String email,
             UpdateProfileRequest request
     ) {
 
-        User user = userRepository
-                .findByEmail(email)
-                .orElseThrow(
-                        () -> new UserNotFoundException(
-                                "User Not Found"
-                        )
-                );
+        User user = getUserByEmail(email);
 
-        user.setMonthlyIncome(
-                request.getMonthlyIncome()
-        );
-
-        user.setRiskProfile(
-                request.getRiskProfile()
-        );
-
-        user.setCurrency(
-                request.getCurrency()
-        );
+        user.setMonthlyIncome(request.getMonthlyIncome());
+        user.setRiskProfile(request.getRiskProfile());
+        user.setCurrency(request.getCurrency());
 
         User updatedUser =
                 userRepository.save(user);
 
-        return ProfileResponse.builder()
-                .firstName(updatedUser.getFirstName())
-                .lastName(updatedUser.getLastName())
-                .email(updatedUser.getEmail())
-                .monthlyIncome(updatedUser.getMonthlyIncome())
-                .riskProfile(updatedUser.getRiskProfile())
-                .currency(updatedUser.getCurrency())
-                .build();
+        return buildProfileResponse(updatedUser);
     }
 
-
+    /**
+     * Calculates the user's financial health.
+     *
+     * @param email Authenticated user's email.
+     * @return Financial health summary.
+     */
     public FinancialHealthResponse getFinancialHealth(
             String email
-    ){
+    ) {
 
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(
-                        ()->new UserNotFoundException("User doew not exists")
-                );
+        User user = getUserByEmail(email);
 
-        List<Expense> expense = expenseRepository.findByUser(user);
+        List<Expense> expenses =
+                expenseRepository.findByUser(user);
 
-//        Get Montly Income
-       Double monthlyIncome = user.getMonthlyIncome();
+        double monthlyIncome =
+                user.getMonthlyIncome();
 
+        double totalExpenses =
+                calculateTotalExpenses(expenses);
 
-//      Get total amount spent
-        Double totalExpenses = expense.stream()
-                .mapToDouble(Expense::getAmount)
-                .sum();
+        double monthlySavings =
+                calculateMonthlySavings(user, expenses);
 
-//      Monthly Savings
-        Double monthlySavings = monthlyIncome - totalExpenses;
-
-//        Saving Rate
-        Double savingsRate =
-                monthlyIncome != null &&
-                        monthlyIncome > 0
-                        ? (monthlySavings /
-                        monthlyIncome) * 100
-                        : 0.0;
-
-        savingsRate = Math.round(
-                        savingsRate * 100.0
-                ) / 100.0;
+        double savingsRate =
+                calculateSavingsRate(user, expenses);
 
         FinancialHealthStatus status;
 
-        if (savingsRate >= 50) {
+        if (savingsRate >= EXCELLENT_SAVINGS_RATE) {
 
             status = FinancialHealthStatus.EXCELLENT;
 
-        } else if (savingsRate >= 20) {
+        } else if (savingsRate >= GOOD_SAVINGS_RATE) {
 
             status = FinancialHealthStatus.GOOD;
 
@@ -139,7 +206,5 @@ public class ProfileService {
                 .savingsRate(savingsRate)
                 .status(status)
                 .build();
-
     }
-
 }
