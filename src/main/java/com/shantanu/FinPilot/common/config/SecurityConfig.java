@@ -122,7 +122,7 @@ public class SecurityConfig {
         // React Frontend URL
         configuration.setAllowedOrigins(List.of(
                 "http://localhost:5173",
-                "https://fin-pilot-frontend-git-main-shantanu-khadse-s-projects.vercel.app"
+                "https://fin-pilot-frontend-lemon.vercel.app"
         ));
 
         // Allowed HTTP Methods
