@@ -97,6 +97,7 @@ public class AuthService {
                 .token(token)
                 .firstName(savedUser.getFirstName())
                 .lastName(savedUser.getLastName())
+                .email(savedUser.getEmail())
                 .build();
     }
 
@@ -138,6 +139,7 @@ public class AuthService {
                 .token(token)
                 .firstName(user.getFirstName())
                 .lastName(user.getLastName())
+                .email(user.getEmail())
                 .build();
     }
 }
