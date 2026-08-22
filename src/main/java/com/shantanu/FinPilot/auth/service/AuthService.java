@@ -1,6 +1,5 @@
 package com.shantanu.FinPilot.auth.service;
 
-
 import com.shantanu.FinPilot.auth.dto.AuthResponse;
 import com.shantanu.FinPilot.auth.dto.LoginRequest;
 import com.shantanu.FinPilot.auth.dto.RegisterRequest;
@@ -23,35 +22,56 @@ import java.time.LocalDateTime;
 @Service
 @RequiredArgsConstructor
 public class AuthService {
+
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
 
-//    User Register Service
-    public void register(RegisterRequest registerRequest){
+    // =========================================================
+    // REGISTER
+    // =========================================================
 
-//        If user already exists
-        if(userRepository.existsByEmail(
-                registerRequest.getEmail())){
+    public AuthResponse register(
+            RegisterRequest registerRequest
+    ) {
+
+        // Check if user already exists
+        if (userRepository.existsByEmail(
+                registerRequest.getEmail()
+        )) {
             throw new UserAlreadyExistsException(
-                    "User already exists with email: " + registerRequest.getEmail()
+                    "User already exists with email: "
+                            + registerRequest.getEmail()
             );
         }
 
-//        If role is present
+        // Get default USER role
         Role role = roleRepository
                 .findByName(RoleType.ROLE_USER)
-                .orElseThrow(()->new RuntimeException("Default role not found"));
+                .orElseThrow(() ->
+                        new RuntimeException(
+                                "Default role not found"
+                        )
+                );
 
-//        Password
-        String encodedPassword = passwordEncoder.encode(registerRequest.getPassword());
+        // Encode password
+        String encodedPassword =
+                passwordEncoder.encode(
+                        registerRequest.getPassword()
+                );
 
-//        Create User Entity to save in DB
+        // Create user
         User user = User.builder()
-                .firstName(registerRequest.getFirstName())
-                .lastName(registerRequest.getLastName())
-                .email(registerRequest.getEmail())
+                .firstName(
+                        registerRequest.getFirstName()
+                )
+                .lastName(
+                        registerRequest.getLastName()
+                )
+                .email(
+                        registerRequest.getEmail()
+                )
                 .password(encodedPassword)
                 .enabled(true)
                 .createdAt(LocalDateTime.now())
@@ -59,13 +79,34 @@ public class AuthService {
                 .build();
 
         user.getRoles().add(role);
-//           Save to DB
-        userRepository.save(user);
 
+        // Save user
+        User savedUser =
+                userRepository.save(user);
+
+        // Generate JWT immediately
+        String token =
+                jwtService.generateToken(
+                        savedUser.getEmail()
+                );
+
+        // Return same response structure
+        // used by login
+        return AuthResponse.builder()
+                .message("Registration successful")
+                .token(token)
+                .firstName(savedUser.getFirstName())
+                .lastName(savedUser.getLastName())
+                .build();
     }
 
-//    User LoginService
-    public AuthResponse login(LoginRequest loginRequest) {
+    // =========================================================
+    // LOGIN
+    // =========================================================
+
+    public AuthResponse login(
+            LoginRequest loginRequest
+    ) {
 
         User user = userRepository
                 .findByEmail(loginRequest.getEmail())
@@ -75,10 +116,11 @@ public class AuthService {
                         )
                 );
 
-        boolean isPasswordValid = passwordEncoder.matches(
-                loginRequest.getPassword(),
-                user.getPassword()
-        );
+        boolean isPasswordValid =
+                passwordEncoder.matches(
+                        loginRequest.getPassword(),
+                        user.getPassword()
+                );
 
         if (!isPasswordValid) {
             throw new InvalidCredentialsException(
@@ -86,16 +128,16 @@ public class AuthService {
             );
         }
 
-        String token = jwtService.generateToken(
-                user.getEmail()
-        );
+        String token =
+                jwtService.generateToken(
+                        user.getEmail()
+                );
 
         return AuthResponse.builder()
-                .message("Login Successful")
+                .message("Login successful")
                 .token(token)
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
                 .build();
     }
-
-
-
 }

@@ -1,6 +1,5 @@
 package com.shantanu.FinPilot.auth.controller;
 
-
 import com.shantanu.FinPilot.auth.dto.AuthResponse;
 import com.shantanu.FinPilot.auth.dto.LoginRequest;
 import com.shantanu.FinPilot.auth.dto.RegisterRequest;
@@ -20,25 +19,35 @@ public class AuthController {
 
     private final AuthService authService;
 
+    // =========================================================
+    // REGISTER
+    // =========================================================
+
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(
             @RequestBody RegisterRequest registerRequest
-            ) {
+    ) {
 
-        authService.register(registerRequest);
+        AuthResponse response =
+                authService.register(registerRequest);
 
-        AuthResponse response = AuthResponse.builder()
-                        .message("User Registered Successfully")
-                        .build();
-
-        return new ResponseEntity<>(response,HttpStatus.CREATED);
+        return new ResponseEntity<>(
+                response,
+                HttpStatus.CREATED
+        );
     }
+
+    // =========================================================
+    // LOGIN
+    // =========================================================
 
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(
             @RequestBody LoginRequest loginRequest
-            ){
-        AuthResponse response = authService.login(loginRequest);
+    ) {
+
+        AuthResponse response =
+                authService.login(loginRequest);
 
         return ResponseEntity.ok(response);
     }

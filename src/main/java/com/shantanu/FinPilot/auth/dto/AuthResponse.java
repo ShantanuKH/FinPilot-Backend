@@ -1,6 +1,5 @@
 package com.shantanu.FinPilot.auth.dto;
 
-
 import lombok.*;
 
 @Getter
@@ -13,4 +12,8 @@ public class AuthResponse {
     private String message;
 
     private String token;
+
+    private String firstName;
+
+    private String lastName;
 }

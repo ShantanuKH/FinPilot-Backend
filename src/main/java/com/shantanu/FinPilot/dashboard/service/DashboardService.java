@@ -46,8 +46,10 @@ public class DashboardService {
 
         return expenses.stream()
                 .filter(expense ->
-                        YearMonth.from(expense.getExpenseDate())
-                                .equals(currentMonth)
+                        expense.getExpenseDate() != null
+                                && YearMonth.from(
+                                expense.getExpenseDate()
+                        ).equals(currentMonth)
                 )
                 .toList();
     }
@@ -68,30 +70,28 @@ public class DashboardService {
         List<Expense> currentMonthExpenses =
                 getCurrentMonthExpenses(expenses);
 
-        Double totalExpenses =
+        double totalExpenses =
                 currentMonthExpenses.stream()
                         .mapToDouble(Expense::getAmount)
                         .sum();
 
-        Long expenseCount =
-                (long) currentMonthExpenses.size();
+        long expenseCount =
+                currentMonthExpenses.size();
 
-        Double highestExpense =
+        double highestExpense =
                 currentMonthExpenses.stream()
                         .mapToDouble(Expense::getAmount)
                         .max()
                         .orElse(0.0);
 
-        Double averageExpense =
+        double averageExpense =
                 currentMonthExpenses.stream()
                         .mapToDouble(Expense::getAmount)
                         .average()
-                        .stream()
-                        .map(avg ->
-                                Math.round(avg * 100.0) / 100.0
-                        )
-                        .findFirst()
                         .orElse(0.0);
+
+        averageExpense =
+                Math.round(averageExpense * 100.0) / 100.0;
 
         return DashboardSummaryResponse.builder()
                 .totalExpenses(totalExpenses)
@@ -114,7 +114,11 @@ public class DashboardService {
         List<Expense> expenses =
                 getUserExpenses(user);
 
-        // Only use current month's expenses
+        /*
+         * Category Breakdown shows only the
+         * current month's spending.
+         */
+
         List<Expense> currentMonthExpenses =
                 getCurrentMonthExpenses(expenses);
 
@@ -166,6 +170,9 @@ public class DashboardService {
 
         Map<YearMonth, Double> monthlyTotals =
                 expenses.stream()
+                        .filter(expense ->
+                                expense.getExpenseDate() != null
+                        )
                         .collect(
                                 Collectors.groupingBy(
                                         expense ->
@@ -208,18 +215,28 @@ public class DashboardService {
         List<Expense> currentMonthExpenses =
                 getCurrentMonthExpenses(expenses);
 
-        Double totalExpenses =
+        double totalExpenses =
                 currentMonthExpenses.stream()
                         .mapToDouble(Expense::getAmount)
                         .sum();
 
-        Double monthlyIncome =
-                user.getMonthlyIncome();
+        /*
+         * A newly registered user may not have
+         * configured their monthly income yet.
+         *
+         * Treat null income as 0 instead of
+         * allowing the dashboard request to fail.
+         */
 
-        Double remainingAmount =
+        double monthlyIncome =
+                user.getMonthlyIncome() != null
+                        ? user.getMonthlyIncome()
+                        : 0.0;
+
+        double remainingAmount =
                 monthlyIncome - totalExpenses;
 
-        Double savingRate =
+        double savingRate =
                 monthlyIncome > 0
                         ? (remainingAmount / monthlyIncome) * 100
                         : 0.0;

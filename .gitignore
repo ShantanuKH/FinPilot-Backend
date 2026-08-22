@@ -34,6 +34,9 @@ build/
 
 
 # Spring Boot Local Config
-src/main/resources/application.properties
 src/main/resources/application-local.properties
 src/main/java/com/shantanu/FinPilot/auth/testFile
+
+.env
+.env.*
+!.env.example
